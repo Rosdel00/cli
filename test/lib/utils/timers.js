@@ -31,6 +31,17 @@ t.test('listens/stops on process', async (t) => {
   t.notOk(timers.unfinished.get('baz'))
 })
 
+t.test('convenience time method', async (t) => {
+  const { timers } = mockTimers(t)
+
+  const end = timers.time('later')
+  timers.time('sync', () => {})
+  await timers.time('async', () => new Promise(r => setTimeout(r, 10)))
+  end()
+
+  t.match(timers.finished, { later: Number, sync: Number, async: Number })
+})
+
 t.test('initial timer', async (t) => {
   const { timers } = mockTimers(t, { start: 'foo' })
   process.emit('timeEnd', 'foo')

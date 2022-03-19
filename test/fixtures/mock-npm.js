@@ -9,10 +9,12 @@ const RealMockNpm = (t, otherMocks = {}) => {
   const mock = {
     ...mockLogs(otherMocks),
     outputs: [],
+    outputErrors: [],
     joinedOutput: () => mock.outputs.map(o => o.join(' ')).join('\n'),
   }
 
   const Npm = t.mock('../../lib/npm.js', {
+    '../../lib/utils/update-notifier.js': async () => {},
     ...otherMocks,
     ...mock.logMocks,
   })
@@ -23,8 +25,16 @@ const RealMockNpm = (t, otherMocks = {}) => {
       super.output(...args)
     }
 
+    originalOutputError (...args) {
+      super.outputError(...args)
+    }
+
     output (...args) {
       mock.outputs.push(args)
+    }
+
+    outputError (...args) {
+      mock.outputErrors.push(args)
     }
   }
 
@@ -100,7 +110,11 @@ const LoadMockNpm = async (t, {
   if (load) {
     await npm.load()
     for (const [k, v] of Object.entries(result(config, { npm, prefix, cache }))) {
-      npm.config.set(k, v)
+      if (typeof v === 'object' && v.value && v.where) {
+        npm.config.set(k, v.value, v.where)
+      } else {
+        npm.config.set(k, v)
+      }
     }
     // Set global loglevel *again* since it possibly got reset during load
     // XXX: remove with npmlog
@@ -115,6 +129,7 @@ const LoadMockNpm = async (t, {
     Npm,
     npm,
     prefix,
+    globalPrefix,
     testdir: dir,
     cache,
     debugFile: async () => {
